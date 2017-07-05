@@ -1,9 +1,10 @@
 library(ggplot2)
 
 
-snps<-read.table("HUM-7_somatic.data.txt", header = FALSE)
+snps<-read.table("GW.trinucs.txt", header = FALSE)
 colnames(snps)=c("chroms","trans","freq")
 
+snps<-read.table("HUM-7_somatic.data.txt", header = FALSE)
 
 ### Barchart
 
@@ -19,7 +20,8 @@ ggplot(snps, aes(x = chroms, y = freq, group = trans, fill = chroms)) + geom_bar
 
 ggplot(snps, aes(x = chroms, y = freq, group = trans, fill = chroms)) + ylim(0, 50) + geom_bar(position="dodge",stat="identity")+facet_wrap(~ trans ) + theme(text = element_text(size=20))
 
-
+snps<-read.table("chroms.trinucs.txt", header = FALSE)
+colnames(snps)=c("chroms","trans","freq", "sample")
 
 # For GW trinucs;
 # Works for all data
@@ -45,10 +47,9 @@ GW_snps <- read.table("GW.trinucs.txt", header = FALSE)
 colnames(GW_snps)=c("tri", "trans", "freq", "sample")
 
 ggplot(GW_snps, aes(tri,freq, group = sample)) +
-	geom_jitter(aes(colour = sample), size = 0.8, alpha = 0.5) +
+	geom_jitter(aes(colour = sample), size = 1, alpha = 0.8) +
 	facet_wrap(~ trans,scale="free_x") +
 	theme(axis.text.x = element_text(angle=45, hjust = 1))
-
 
 
 # Per chromosome
