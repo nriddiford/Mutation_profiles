@@ -48,7 +48,7 @@ my $data_ref;
 $data_ref = parse_vcf($vcf_file) if $vcf_file;
 $data_ref = parse_varscan($in_file) if $in_file;
 
-my ($filtered_data_ref) = apply_filters($data_ref);
+my ($filtered_data_ref) = get_context($data_ref);
 my ($sample, $all_snvs_count, $genome_wide_snvs_ref, $snvs_by_chrom_ref, $snp_count_ref, $snp_freq_ref, $tri_count_ref, $snv_dist_ref) = count($filtered_data_ref);
 
 write_snvs_per_chrom($chrom_out_file, $sample, $snvs_by_chrom_ref, $snp_count_ref);
@@ -58,7 +58,7 @@ write_snv_distribution($all_snvs_count, $sample, $snv_dist_ref);
 
 sub get_genome {
   my $genome_file = shift;
-  my $seqio = Bio::SeqIO->new(-file => "$genome_file", '-format' => 'Fasta');
+  my $seqio = Bio::SeqIO->new('-file' => "$genome_file", '-format' => 'Fasta');
 
   my $genome_length;
 
@@ -103,7 +103,7 @@ sub parse_vcf {
   open my $VCF_in, '<', $vcf_file or die $!;
 
   my ( $name, $extention ) = split(/\.([^.]+)$/, basename($vcf_file), 2);
-  my ($sample) = split(/\./, $name, 0);
+  my ($sample) = split(/_/, $name, 0);
 
   say "Parsing VCF file...";
   my @vars;
@@ -114,14 +114,14 @@ sub parse_vcf {
     my ($chr, $pos, $ref, $alt) = (split)[0,1,3,4];
     my ($n_freq, $t_freq) = ('-', '-');
     next if $ref eq 'N';
-    my $type = $_ =~ /TYPE=(.*?);/;
+    my $type = $_ =~ /VT=(.*?);/;
     # my $depth = $_ =~ /
     push @vars, [$sample, $chr, $pos, $ref, $alt, $n_freq, $t_freq, $type];
   }
   return(\@vars);
 }
 
-sub apply_filters {
+sub get_context {
   my $var_ref = shift;
   my (@filtered_vars, %snvs);
 
@@ -140,11 +140,45 @@ sub apply_filters {
         say "excluding $trinuc";
         next;
       }
-      push @filtered_vars, [$sample, $chr, $pos, $ref, $alt, $n_freq, $t_freq, $trinuc];
+
+      my ($trans_trinuc, $grouped_ref, $grouped_alt) = group_muts($trinuc, $ref, $alt);
+
+      push @filtered_vars, [$sample, $chr, $pos, $ref, $alt, $n_freq, $t_freq, $trinuc, $trans_trinuc, $grouped_ref, $grouped_alt];
     }
   }
   return(\@filtered_vars);
 }
+
+sub group_muts {
+  my ($trinuc, $ref, $alt) = @_;
+  my ($new_ref, $new_alt) = ($ref, $alt);
+
+  if ($ref eq 'G'){
+    $new_ref = 'C';
+    $new_alt = 'A' if $alt eq 'T';
+    $new_alt = 'G' if $alt eq 'C';
+    $new_alt = 'T' if $alt eq 'A';
+    $trinuc = rev_comp($trinuc);
+  }
+  elsif ($ref eq 'A'){
+    $new_ref = 'T';
+    $new_alt = 'A' if $alt eq 'T';
+    $new_alt = 'C' if $alt eq 'G';
+    $new_alt = 'G' if $alt eq 'C';
+    $trinuc = rev_comp($trinuc);
+  }
+
+  return($trinuc, $new_ref, $new_alt);
+}
+
+sub rev_comp {
+  my $trinuc = shift;
+  my $rev_tri = reverse($trinuc);
+  # complement the reversed DNA sequence
+  $rev_tri =~ tr/ABCDGHMNRSTUVWXYabcdghmnrstuvwxy/TVGHCDKNYSAABWXRtvghcdknysaabwxr/;
+  return $rev_tri;
+}
+
 
 sub count {
   my ($var_ref) = shift;
@@ -156,7 +190,7 @@ sub count {
   my $sample;
 
   foreach my $var ( @$var_ref ) {
-    my ($samp, $chr, $pos, $ref, $alt, $n_freq, $t_freq, $trinuc) = @$var;
+    my ($samp, $chr, $pos, $ref, $alt, $n_freq, $t_freq, $trinuc, $trans_trinuc, $grouped_ref, $grouped_alt) = @$var;
     $sample = $samp;
 
     $genome_wide_snvs{$trinuc}{"$ref>$alt"}++;		# count genome-wide trinuc transformations: "A>C"
@@ -169,7 +203,7 @@ sub count {
     $tri_count{$chr}++;								            # count total trinucs per chromosome
 
     # Record location of each snv per sample
-    push @snv_dist, [ $sample, $chr, $pos, $alt, $trinuc, "$ref>$alt" ];
+    push @snv_dist, [ $sample, $chr, $pos, $alt, $trinuc, "$ref>$alt", $trans_trinuc, "$grouped_ref>$grouped_alt" ];
 
     my $snp_count = $snp_freq{$chr}{$ref}{$alt};
     my ($mut_cont) = eval sprintf('%.1f', $snp_count/$snp_count{$chr} * 100);
@@ -228,9 +262,9 @@ sub write_snv_distribution {
   say "Printing out genome-wide snv distribution '$snv_dist_file' for $sample...";
 
   foreach my $var ( @$snv_dist_ref ) {
-    my ($samp, $chr, $pos, $alt, $trinuc, $trans) = @$var;
+    my ($samp, $chr, $pos, $alt, $trinuc, $trans, $decomp_trinuc, $grouped_trans) = @$var;
     $sample = $samp;
-    print $snv_dist join("\t", $chr, $pos, $alt, $trinuc, $trans, $sample) . "\n";
+    print $snv_dist join("\t", $chr, $pos, $alt, $trinuc, $trans, $decomp_trinuc, $grouped_trans, $sample) . "\n";
   }
 }
 
