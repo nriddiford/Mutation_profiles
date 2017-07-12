@@ -203,7 +203,7 @@ sub count {
     $tri_count{$chr}++;								            # count total trinucs per chromosome
 
     # Record location of each snv per sample
-    push @snv_dist, [ $sample, $chr, $pos, $alt, $trinuc, "$ref>$alt", $trans_trinuc, "$grouped_ref>$grouped_alt" ];
+    push @snv_dist, [ $sample, $chr, $pos, $ref, $alt, $trinuc, "$ref>$alt", $trans_trinuc, "$grouped_ref>$grouped_alt" ];
 
     my $snp_count = $snp_freq{$chr}{$ref}{$alt};
     my ($mut_cont) = eval sprintf('%.1f', $snp_count/$snp_count{$chr} * 100);
@@ -262,9 +262,9 @@ sub write_snv_distribution {
   say "Printing out genome-wide snv distribution '$snv_dist_file' for $sample...";
 
   foreach my $var ( @$snv_dist_ref ) {
-    my ($samp, $chr, $pos, $alt, $trinuc, $trans, $decomp_trinuc, $grouped_trans) = @$var;
+    my ($samp, $chr, $pos, $ref, $alt, $trinuc, $trans, $decomp_trinuc, $grouped_trans) = @$var;
     $sample = $samp;
-    print $snv_dist join("\t", $chr, $pos, $alt, $trinuc, $trans, $decomp_trinuc, $grouped_trans, $sample) . "\n";
+    print $snv_dist join("\t", $sample, $chr, $pos, $ref, $alt, $trinuc, $trans, $decomp_trinuc, $grouped_trans) . "\n";
   }
 }
 

@@ -31,7 +31,7 @@ ts_tv <- function(){
   GW_snvs <- read.table("GW.snv.dist.txt", header = FALSE)
   colnames(GW_snvs)=c("chrom", "bp", "snv", "tri", "trans", "decomposed_tri", "grouped_trans", "sample")
   
-  GW_snvs<-filteR(GW_snvs)
+  #GW_snvs<-filteR(GW_snvs)
   
   all_ts<-nrow(filter(GW_snvs, trans == "A>G" | trans == "C>T" | trans == "G>A" | trans == "T>C"))
   all_tv<-nrow(filter(GW_snvs, trans != "A>G" & trans != "C>T" & trans != "G>A" & trans != "T>C"))
@@ -41,7 +41,7 @@ ts_tv <- function(){
 
 mutation_spectrum <- function(){
   GW_snvs <- read.table("GW.snv.dist.txt", header = FALSE)
-  colnames(GW_snvs)=c("chrom", "bp", "snv", "tri", "trans", "decomposed_tri", "grouped_trans", "sample")
+  colnames(GW_snvs)=c("sample", "chrom", "pos", "ref", "alt", "tri", "trans", "decomposed_tri", "grouped_trans")
   
   #GW_snvs<-filteR(GW_snvs)
   cat("Showing global contribution of tri class to mutation load", "\n")
@@ -68,7 +68,7 @@ mutation_spectrum <- function(){
 
 samples_plot <- function(){
   GW_snvs <- read.table("GW.snv.dist.txt", header = FALSE)
-  colnames(GW_snvs)=c("chrom", "bp", "snv", "tri", "trans", "decomposed_tri", "grouped_trans", "sample")
+  colnames(GW_snvs)=c("sample", "chrom", "pos", "ref", "alt", "tri", "trans", "decomposed_tri", "grouped_trans")
   
   #GW_snvs<-filteR(GW_snvs)
   
