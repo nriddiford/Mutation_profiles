@@ -41,7 +41,7 @@ ts_tv <- function(){
 
 mutation_spectrum <- function(){
   GW_snvs <- read.table("GW.snv.dist.txt", header = FALSE)
-  colnames(GW_snvs)=c("sample", "chrom", "pos", "ref", "alt", "tri", "trans", "decomposed_tri", "grouped_trans")
+  colnames(GW_snvs)=c("sample", "chrom", "pos", "ref", "alt", "tri", "trans", "decomposed_tri", "grouped_trans", "type")
   
   #GW_snvs<-filteR(GW_snvs)
   cat("Showing global contribution of tri class to mutation load", "\n")
@@ -66,14 +66,21 @@ mutation_spectrum <- function(){
 
 }
 
-samples_plot <- function(){
+samples_plot <- function(count=NA){
   GW_snvs <- read.table("GW.snv.dist.txt", header = FALSE)
-  colnames(GW_snvs)=c("sample", "chrom", "pos", "ref", "alt", "tri", "trans", "decomposed_tri", "grouped_trans")
+  colnames(GW_snvs)=c("sample", "chrom", "pos", "ref", "alt", "tri", "trans", "decomposed_tri", "grouped_trans", "type")
   
   #GW_snvs<-filteR(GW_snvs)
-  
+
   p<-ggplot(GW_snvs)
-  p<-p + geom_bar(aes(x = grouped_trans, y = (..count..)/sum(..count..), group = sample, fill = sample), position="dodge",stat="count")
+  if(is.na(count)){
+    p<-p + geom_bar(aes(x = grouped_trans, y = (..count..)/sum(..count..), group = sample, fill = sample), position="dodge",stat="count")
+    tag='_freq'
+  }
+  else{
+    p<-p + geom_bar(aes(x = grouped_trans, y = ..count.., group = sample, fill = sample), position="dodge",stat="count")
+    tag='_count'
+  }
   p<-p + scale_y_continuous("Relative contribution to total mutation load", expand = c(0.0, .001))
   p<-p + scale_x_discrete("Mutation class")
   p<-p + clean_theme() + 
@@ -83,13 +90,51 @@ samples_plot <- function(){
     )
   p<-p + facet_wrap(~sample, ncol = 4, scale = "free_x" )
   
-  samples_mut_spect<-paste("mutation_spectrum_samples.pdf")
+  samples_mut_spect<-paste("mutation_spectrum_samples", tag, ".pdf", sep = '')
   cat("Writing file", samples_mut_spect, "\n")
   ggsave(paste("plots/", samples_mut_spect, sep=""), width = 20, height = 10)
   p
   
   
 }
+
+
+mutational_signatures <- function(){
+  library(BSgenome.Dmelanogaster.UCSC.dm6, quietly = TRUE)
+  library(deconstructSigs, quietly = TRUE)
+  
+  GW_snvs <- read.table("GW.snv.dist.txt", header = FALSE)
+  colnames(GW_snvs)=c("sample", "chrom", "pos", "ref", "alt", "tri", "trans", "decomposed_tri", "grouped_trans", "type")
+ 
+  somatic_snvs <- filter(GW_snvs, type == 'somatic')
+  
+  genome <- BSgenome.Dmelanogaster.UCSC.dm6
+  
+  sigs.input <- mut.to.sigs.input(mut.ref = somatic_snvs, sample.id = "sample", chr = "chrom", pos = "pos", alt = "alt", ref = "ref", bsg = genome)
+  cat("sample", "snv_count", sep="\t", "\n")
+  for (s in levels(somatic_snvs$sample)) {
+    snv_count<-nrow(filter(somatic_snvs, sample == s))
+  
+    if(snv_count > 50){
+      cat(s, snv_count, sep="\t", "\n")
+        
+      plot_example<-whichSignatures(tumor.ref = sigs.input, 
+                                    signatures.ref = signatures.cosmic, 
+                                    sample.id = s, 
+                                    contexts.needed = TRUE,
+                                    tri.counts.method = 'exome')
+
+      plotSignatures(plot_example)
+    }
+  }
+}
+
+
+
+
+
+
+
 
 genome_wide_trinucs <- function(){
   GW_snps <- read.table("GW.trinucs.txt", header = FALSE)
