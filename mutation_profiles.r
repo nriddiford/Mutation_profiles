@@ -29,7 +29,7 @@ clean_theme <- function(base_size = 12){
 
 ts_tv <- function(){
   GW_snvs <- read.table("GW.snv.dist.txt", header = FALSE)
-  colnames(GW_snvs)=c("chrom", "bp", "snv", "tri", "trans", "decomposed_tri", "grouped_trans", "sample")
+  colnames(GW_snvs)=c("sample", "chrom", "pos", "ref", "alt", "tri", "trans", "decomposed_tri", "grouped_trans", "type")
   
   #GW_snvs<-filteR(GW_snvs)
   
