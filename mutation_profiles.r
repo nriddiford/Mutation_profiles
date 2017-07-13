@@ -1,6 +1,7 @@
 library(ggplot2)
 library(dplyr)
 
+
 filteR <- function(x){
   data<-x
   #filter on chroms
@@ -11,6 +12,7 @@ filteR <- function(x){
   dir.create(file.path("plots"), showWarnings = FALSE)
   return(data)
 }
+
 
 clean_theme <- function(base_size = 12){
   theme(
@@ -27,29 +29,38 @@ clean_theme <- function(base_size = 12){
 }
 
 
-stats <- function(){
-  GW_snvs <- read.table("GW.snv.dist.txt", header = FALSE)
-  colnames(GW_snvs)=c("sample", "chrom", "pos", "ref", "alt", "tri", "trans", "decomposed_tri", "grouped_trans", "type")
+get_data <- function(infile = "GW.snv.dist.txt"){
+  data<-read.delim(infile, header = F)
+  colnames(data)=c("sample", "chrom", "pos", "ref", "alt", "tri", "trans", "decomposed_tri", "grouped_trans", "type")
   
-  #GW_snvs<-filteR(GW_snvs)
+  #filter on chroms
+  # data<-filter(data, chrom != "Y" & chrom != "4")
+  #filter out samples
+  # data<-filter(data, sample != "A373R1" & sample != "A373R7" & sample != "A512R17" )
+  # data<-droplevels(data)
+  dir.create(file.path("plots"), showWarnings = FALSE)
+  return(data)
+}
+
+
+stats <- function(){
+  data<-get_data()
   cat("Number of somatic mutations per sample:")
-  rank<-sort(table(GW_snvs$sample), decreasing = TRUE)
+  rank<-sort(table(data$sample), decreasing = TRUE)
   print(rank)
   
-  all_ts<-nrow(filter(GW_snvs, trans == "A>G" | trans == "C>T" | trans == "G>A" | trans == "T>C"))
-  all_tv<-nrow(filter(GW_snvs, trans != "A>G" & trans != "C>T" & trans != "G>A" & trans != "T>C"))
+  all_ts<-nrow(filter(data, trans == "A>G" | trans == "C>T" | trans == "G>A" | trans == "T>C"))
+  all_tv<-nrow(filter(data, trans != "A>G" & trans != "C>T" & trans != "G>A" & trans != "T>C"))
   ts_tv<-all_ts/all_tv
   cat("ts/tv =", ts_tv)
 }
 
+
 mutation_spectrum <- function(){
-  GW_snvs <- read.table("GW.snv.dist.txt", header = FALSE)
-  colnames(GW_snvs)=c("sample", "chrom", "pos", "ref", "alt", "tri", "trans", "decomposed_tri", "grouped_trans", "type")
-  
-  #GW_snvs<-filteR(GW_snvs)
+  data<-get_data()
   cat("Showing global contribution of tri class to mutation load", "\n")
  
-  p<-ggplot(GW_snvs)
+  p<-ggplot(data)
   p<-p + geom_bar(aes(x = decomposed_tri, y = (..count..)/sum(..count..), group = decomposed_tri, fill = grouped_trans), position="dodge",stat="count")
   p<-p + scale_y_continuous("Relative contribution to mutation load", expand = c(0.0, .0005))
   p<-p + scale_x_discrete("Genomic context", expand = c(.005, .005))
@@ -69,13 +80,12 @@ mutation_spectrum <- function(){
 
 }
 
-samples_plot <- function(count=NA){
-  GW_snvs <- read.table("GW.snv.dist.txt", header = FALSE)
-  colnames(GW_snvs)=c("sample", "chrom", "pos", "ref", "alt", "tri", "trans", "decomposed_tri", "grouped_trans", "type")
-  
-  #GW_snvs<-filteR(GW_snvs)
 
-  p<-ggplot(GW_snvs)
+samples_plot <- function(count=NA){
+  data<-get_data()
+
+  p<-ggplot(data)
+  
   if(is.na(count)){
     p<-p + geom_bar(aes(x = grouped_trans, y = (..count..)/sum(..count..), group = sample, fill = sample), position="dodge",stat="count")
     tag='_freq'
@@ -106,28 +116,25 @@ mutational_signatures <- function(samples=NA, pie=NA){
   library(BSgenome.Dmelanogaster.UCSC.dm6, quietly = TRUE)
   library(deconstructSigs, quietly = TRUE)
   
-  GW_snvs <- read.table("GW.snv.dist.txt", header = FALSE)
-  colnames(GW_snvs)=c("sample", "chrom", "pos", "ref", "alt", "tri", "trans", "decomposed_tri", "grouped_trans", "type")
- 
+  data<-get_data()
   
   genome <- BSgenome.Dmelanogaster.UCSC.dm6
   
-  somatic_snvs <- filter(GW_snvs, type == 'somatic')
-  
+  somatic_snvs <- filter(data, type == 'somatic')
   
   if(is.na(samples)){
   	somatic_snvs$tissue = 'All'
     sigs.input <- mut.to.sigs.input(mut.ref = somatic_snvs, sample.id = "tissue", chr = "chrom", pos = "pos", alt = "alt", ref = "ref", bsg = genome)
-    plot_example<-whichSignatures(tumor.ref = sigs.input, 
-                  signatures.ref = signatures.nature2013, 
-                  sample.id = 'All', 
-                  contexts.needed = TRUE,
-                  tri.counts.method = 'genome')
+    sig_plot<-whichSignatures(tumor.ref = sigs.input, signatures.ref = signatures.nature2013,
+                              sample.id = 'All',
+                              contexts.needed = TRUE,
+                              tri.counts.method = 'genome')
 
-    plotSignatures(plot_example)
-      if(!is.na(pie)){
-        makePie(plot_example)
-      }
+    plotSignatures(sig_plot)
+    
+    if(!is.na(pie)){
+      makePie(sig_plot)
+    }
   }
   
   else{
@@ -139,15 +146,14 @@ mutational_signatures <- function(samples=NA, pie=NA){
         if(snv_count > 50){
           cat(s, snv_count, sep="\t", "\n")
         
-          plot_example<-whichSignatures(tumor.ref = sigs.input, 
-                        signatures.ref = signatures.nature2013, 
-                        sample.id = s, 
+          sig_plot<-whichSignatures(tumor.ref = sigs.input, signatures.ref = signatures.nature2013,
+                        sample.id = s,
                         contexts.needed = TRUE,
                         tri.counts.method = 'genome')
 
-          plotSignatures(plot_example)
+          plotSignatures(sig_plot)
             if(!is.na(pie)){
-              makePie(plot_example)
+              makePie(sig_plot)
             }
         }
       }
@@ -155,58 +161,38 @@ mutational_signatures <- function(samples=NA, pie=NA){
 }
 
 
-
-
-
-
-
-
-genome_wide_trinucs <- function(){
-  GW_snps <- read.table("GW.trinucs.txt", header = FALSE)
-  colnames(GW_snps)=c("tri", "trans", "freq", "sample")
-  p<-ggplot(GW_snps, aes(tri,freq, group = sample))
-  p<-p + geom_jitter(aes(colour = sample), size = 1, alpha = 0.9)
-  p<-p + facet_wrap(~ trans,scale="free_x")
-  p<-p + theme(axis.text.x = element_text(angle=45, hjust = 1))
-  p
+notch_hits <- function(){
   
-  GW_snps <- read.table("GW.snv.dist.txt", header = FALSE)
-  colnames(GW_snps)=c("chrom", "bp", "snv", "tri", "trans", "sample")
+  data <- read.table("GW.snv.dist.txt", header = FALSE)
+  colnames(data)=c("sample", "chrom", "pos", "ref", "alt", "tri", "trans", "decomposed_tri", "grouped_trans", "type")
   
-  p<-ggplot(GW_snps, aes(tri, y = (..count..)/sum(..count..), group = sample))
-  p<-p + geom_jitter(aes(colour = sample), size = 1, alpha = 0.9,stat="count")
-  p<-p + facet_wrap(~ trans,scale="free_x")
-  p<-p + theme(axis.text.x = element_text(angle=45, hjust = 1))
-  p
+  data<-filter(data, chrom == "X", pos >= 3000000, pos <= 3300000)
   
-}
-
-
-chrom_wide_trinucs <- function(chrom_filt=NA){
-  if(is.na(chrom_filt)){
-    chrom_filt<-"X"
-  }
-  by_chrom <- read.table("chroms.trinucs.txt", header = FALSE)
-  colnames(by_chrom)=c("chrom", "tri", "trans", "freq", "sample")
+  p<-ggplot(data)
+  p<-p + geom_point(aes(pos/1000000, sample, colour = trans, size = 2))
+  p<-p + guides(size = FALSE, sample = FALSE)
+  p<-p + clean_theme() +
+    theme(axis.title.y=element_blank(),
+          panel.grid.major.y = element_line(color="grey80", size = 0.5, linetype = "dotted")
+    )
+  p<-p + scale_x_continuous("Mbs", expand = c(0,0), breaks = seq(3,3.3,by=0.05), limits=c(3, 3.301))
   
-  chrom_snps <- filter(by_chrom, chrom == chrom_filt)
-
-  p<-ggplot(chrom_snps, aes(tri,freq, group = sample))
-  p<-p + geom_jitter(aes(colour = sample), size = 1, alpha = 0.9)
-  p<-p + facet_wrap(~ trans,scale="free_x")
-  p<-p + theme(axis.text.x = element_text(angle=45, hjust = 1))
-  p<-p + ggtitle( paste( "Chromosome", chrom_filt))
+  p<-p + annotate("rect", xmin=3.000000, xmax=3.134532, ymin=0, ymax=0.5, alpha=.2, fill="green")
+  p<-p + annotate("rect", xmin=3.134870, xmax=3.172221, ymin=0, ymax=0.5, alpha=.2, fill="skyblue")
+  p<-p + annotate("rect", xmin=3.176440, xmax=3.300000, ymin=0, ymax=0.5, alpha=.2, fill="red")
+  
   p
 }
+
 
 genome_wide_snvs <- function(){
   GW_snv_dist <- read.table("GW.snv.dist.txt", header = FALSE)
-  colnames(GW_snv_dist)=c("chrom", "bp", "snv", "tri", "trans", "sample")
+  colnames(GW_snv_dist)=c("sample", "chrom", "pos", "ref", "alt", "tri", "trans", "decomposed_tri", "grouped_trans", "type")
   
   GW_snv_dist<-filteR(GW_snv_dist)
   
   p<-ggplot(GW_snv_dist)
-  p<-p + geom_point(aes(bp/1000000, sample, colour = trans))
+  p<-p + geom_point(aes(pos/1000000, sample, colour = trans))
   # p<-p + guides(color = FALSE)
   p<-p + theme(axis.text.x = element_text(angle=45, hjust = 1))
   
