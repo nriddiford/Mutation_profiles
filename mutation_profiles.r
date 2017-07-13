@@ -1,8 +1,8 @@
 library(ggplot2)
 library(dplyr)
 
-filteR <- function(df=x){
-  data<-df
+filteR <- function(x){
+  data<-x
   #filter on chroms
   #data<-filter(data, chrom != "Y" & chrom != "4")
   #filter out samples
@@ -27,11 +27,14 @@ clean_theme <- function(base_size = 12){
 }
 
 
-ts_tv <- function(){
+stats <- function(){
   GW_snvs <- read.table("GW.snv.dist.txt", header = FALSE)
   colnames(GW_snvs)=c("sample", "chrom", "pos", "ref", "alt", "tri", "trans", "decomposed_tri", "grouped_trans", "type")
   
   #GW_snvs<-filteR(GW_snvs)
+  cat("Number of somatic mutations per sample:")
+  rank<-sort(table(GW_snvs$sample), decreasing = TRUE)
+  print(rank)
   
   all_ts<-nrow(filter(GW_snvs, trans == "A>G" | trans == "C>T" | trans == "G>A" | trans == "T>C"))
   all_tv<-nrow(filter(GW_snvs, trans != "A>G" & trans != "C>T" & trans != "G>A" & trans != "T>C"))
@@ -99,33 +102,55 @@ samples_plot <- function(count=NA){
 }
 
 
-mutational_signatures <- function(){
+mutational_signatures <- function(samples=NA, pie=NA){
   library(BSgenome.Dmelanogaster.UCSC.dm6, quietly = TRUE)
   library(deconstructSigs, quietly = TRUE)
   
   GW_snvs <- read.table("GW.snv.dist.txt", header = FALSE)
   colnames(GW_snvs)=c("sample", "chrom", "pos", "ref", "alt", "tri", "trans", "decomposed_tri", "grouped_trans", "type")
  
-  somatic_snvs <- filter(GW_snvs, type == 'somatic')
   
   genome <- BSgenome.Dmelanogaster.UCSC.dm6
   
-  sigs.input <- mut.to.sigs.input(mut.ref = somatic_snvs, sample.id = "sample", chr = "chrom", pos = "pos", alt = "alt", ref = "ref", bsg = genome)
-  cat("sample", "snv_count", sep="\t", "\n")
-  for (s in levels(somatic_snvs$sample)) {
-    snv_count<-nrow(filter(somatic_snvs, sample == s))
+  somatic_snvs <- filter(GW_snvs, type == 'somatic')
   
-    if(snv_count > 50){
-      cat(s, snv_count, sep="\t", "\n")
-        
-      plot_example<-whichSignatures(tumor.ref = sigs.input, 
-                                    signatures.ref = signatures.cosmic, 
-                                    sample.id = s, 
-                                    contexts.needed = TRUE,
-                                    tri.counts.method = 'exome')
+  
+  if(is.na(samples)){
+  	somatic_snvs$tissue = 'All'
+    sigs.input <- mut.to.sigs.input(mut.ref = somatic_snvs, sample.id = "tissue", chr = "chrom", pos = "pos", alt = "alt", ref = "ref", bsg = genome)
+    plot_example<-whichSignatures(tumor.ref = sigs.input, 
+                  signatures.ref = signatures.nature2013, 
+                  sample.id = 'All', 
+                  contexts.needed = TRUE,
+                  tri.counts.method = 'genome')
 
-      plotSignatures(plot_example)
-    }
+    plotSignatures(plot_example)
+      if(!is.na(pie)){
+        makePie(plot_example)
+      }
+  }
+  
+  else{
+  	sigs.input <- mut.to.sigs.input(mut.ref = somatic_snvs, sample.id = "sample", chr = "chrom", pos = "pos", alt = "alt", ref = "ref", bsg = genome)
+  	cat("sample", "snv_count", sep="\t", "\n")
+      for (s in levels(somatic_snvs$sample)) {
+        snv_count<-nrow(filter(somatic_snvs, sample == s))
+  
+        if(snv_count > 50){
+          cat(s, snv_count, sep="\t", "\n")
+        
+          plot_example<-whichSignatures(tumor.ref = sigs.input, 
+                        signatures.ref = signatures.nature2013, 
+                        sample.id = s, 
+                        contexts.needed = TRUE,
+                        tri.counts.method = 'genome')
+
+          plotSignatures(plot_example)
+            if(!is.na(pie)){
+              makePie(plot_example)
+            }
+        }
+      }
   }
 }
 
@@ -190,3 +215,5 @@ genome_wide_snvs <- function(){
   
   p
 }
+
+
