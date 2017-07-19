@@ -1,5 +1,7 @@
+require(dplyr)
+
+
 trinuc.freqs <- function(genome=NA, write=NA){
-  library(dplyr)
   if(is.na(genome)){
     cat("No genome specfied, defaulting to 'BSgenome.Dmelanogaster.UCSC.dm6'\n")
     library(BSgenome.Dmelanogaster.UCSC.dm6, quietly = TRUE)
@@ -9,15 +11,19 @@ trinuc.freqs <- function(genome=NA, write=NA){
   params <- new("BSParams", X = Dmelanogaster, FUN = trinucleotideFrequency, exclude = c("M", "_"), simplify = TRUE)
   data<-as.data.frame(bsapply(params))
   data$genome<-as.integer(rowSums(data))
-  gen_wide <- data['genome']
-  colnames(gen_wide) <- NULL
+  data$x<-(data$genome*2)
+  gen_wide <- data['x']
+  #gen_wide<-cbind(tri = rownames(gen_wide), gen_wide)
+  #colnames(gen_wide) <- c("tri", "x")
+  #rownames(gen_wide) <- NULL
   
   if(is.na(write)){
     return(gen_wide)
   }
   else{
     cat("Writing genome-wide trinucleotide frequencies to 'data/tri.counts.dmel6.rda'\n")
-    saveRDS(gen_wide, "data/tri.counts.dmel6.rda")
+    write.table(gen_wide, "data/tri.counts.dmel6.txt", sep="\t", quote=FALSE)
+    save(gen_wide, file="data/tri.counts.dmel6.rda")
   }
 }
 
