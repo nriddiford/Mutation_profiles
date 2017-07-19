@@ -110,9 +110,15 @@ mutational_signatures <- function(samples=NA, pie=NA){
     sigs.input <- mut.to.sigs.input(mut.ref = somatic_snvs, sample.id = "tissue", chr = "chrom", pos = "pos", alt = "alt", ref = "ref", bsg = genome)
     sig_plot<-whichSignatures(tumor.ref = sigs.input, signatures.ref = signatures.nature2013, sample.id = 'All',
                               contexts.needed = TRUE,
-                              tri.counts.method = 'genome')
+                              tri.counts.method = 'genome'
+                              )
 
-    p<-plotSignatures(sig_plot)
+    cat("Writing to file 'plots/all_signatures.pdf'\n")
+    pdf('plots/all_signatures.pdf', width = 20, height = 10)
+    plotSignatures(sig_plot)
+    dev.off()
+    plotSignatures(sig_plot)
+    
 
     if(!is.na(pie)){
       makePie(sig_plot)
@@ -131,6 +137,12 @@ mutational_signatures <- function(samples=NA, pie=NA){
           sig_plot<-whichSignatures(tumor.ref = sigs.input, signatures.ref = signatures.nature2013, sample.id = s,
                         contexts.needed = TRUE,
                         tri.counts.method = 'genome')
+          
+          outfile<-(paste('plots/', s, '_signatures.pdf', sep = ''))
+          cat("Writing to file", outfile, "\n")
+          pdf(outfile, width = 20, height = 10)
+          plotSignatures(sig_plot)
+          dev.off()
           plotSignatures(sig_plot)
           
           if(!is.na(pie)){
