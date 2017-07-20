@@ -11,19 +11,22 @@ trinuc.freqs <- function(genome=NA, write=NA){
   params <- new("BSParams", X = Dmelanogaster, FUN = trinucleotideFrequency, exclude = c("M", "_"), simplify = TRUE)
   data<-as.data.frame(bsapply(params))
   data$genome<-as.integer(rowSums(data))
-  data$x<-(data$genome*2)
-  gen_wide <- data['x']
+  data$gen2<-(data$genome*2)
+  data$x <- (1/data$genome)
+  
+  scaling_factor<-data['x']
+  
   #gen_wide<-cbind(tri = rownames(gen_wide), gen_wide)
   #colnames(gen_wide) <- c("tri", "x")
   #rownames(gen_wide) <- NULL
   
   if(is.na(write)){
-    return(gen_wide)
+    return(scaling_factor)
   }
   else{
     cat("Writing genome-wide trinucleotide frequencies to 'data/tri.counts.dmel6.rda'\n")
-    write.table(gen_wide, "data/tri.counts.dmel6.txt", sep="\t", quote=FALSE)
-    save(gen_wide, file="data/tri.counts.dmel6.rda")
+    write.table(scaling_factor, "data/tri.counts.dmel6.txt", sep="\t", quote=FALSE)
+    save(scaling_factor, file="data/tri.counts.dmel6.rda")
   }
 }
 

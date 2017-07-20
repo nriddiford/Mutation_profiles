@@ -5,12 +5,11 @@ use Data::Dumper;
 use feature qw/ say /;
 use FindBin '$Script';
 use Bio::SeqIO;
-
 use File::Basename;
 
 use Getopt::Long qw/ GetOptions /;
 
-my $genome_file = '/Users/Nick_curie/Documents/Curie/Data/Genomes/dmel_6.12.fa';
+my $genome_file;
 my $vcf_file;
 my $chrom_out_file = 'chroms.trinucs.txt';
 my $genome_out_file = 'GW.trinucs.txt';
@@ -53,7 +52,7 @@ my ($sample, $all_snvs_count, $genome_wide_snvs_ref, $snvs_by_chrom_ref, $snp_co
 
 write_snvs_per_chrom($chrom_out_file, $sample, $snvs_by_chrom_ref, $snp_count_ref);
 write_snvs_genome_wide($all_snvs_count, $sample, $genome_wide_snvs_ref);
-write_snv_distribution($all_snvs_count, $sample, $snv_dist_ref);
+write_dataframe($all_snvs_count, $sample, $snv_dist_ref);
 
 
 sub get_genome {
@@ -97,13 +96,22 @@ sub parse_varscan {
 }
 
 my %data;
+
 sub parse_vcf {
   my $vcf_file = shift;
-  say "Reading in VCF file: $vcf_file";
-  open my $VCF_in, '<', $vcf_file or die $!;
 
   my ( $name, $extention ) = split(/\.([^.]+)$/, basename($vcf_file), 2);
+  my $VCF_in;
   my ($sample) = split(/_/, $name, 0);
+
+  if ( $extention eq 'gz'){
+    say "Reading in compressed VCF file: $vcf_file";
+    open $VCF_in, "zcat $vcf_file |" or die $!;
+  }
+  else{
+    say "Reading in VCF file: $vcf_file";
+    open $VCF_in, '<', $vcf_file or die $!;
+  }
 
   say "Parsing VCF file...";
   my @vars;
@@ -114,12 +122,14 @@ sub parse_vcf {
     my ($chr, $pos, $ref, $alt) = (split)[0,1,3,4];
     my ($n_freq, $t_freq) = ('-', '-');
     next if $ref eq 'N';
-    my $type = $_ =~ /VT=(.*?);/;
+    my $type = '-';
+    ($type) = $_ =~ /VT=(.*?);/;
     # my $depth = $_ =~ /
     push @vars, [$sample, $chr, $pos, $ref, $alt, $n_freq, $t_freq, $type];
   }
   return(\@vars);
 }
+
 
 sub get_context {
   my $var_ref = shift;
@@ -127,8 +137,6 @@ sub get_context {
 
   foreach my $var ( @$var_ref ) {
     my ($sample, $chr, $pos, $ref, $alt, $n_freq, $t_freq, $type) = @$var;
-
-    next if $type eq 'Germline';
 
    	if ( length $ref == 1 and length $alt == 1 and $chroms{$chr} ) {
 
@@ -143,11 +151,12 @@ sub get_context {
 
       my ($trans_trinuc, $grouped_ref, $grouped_alt) = group_muts($trinuc, $ref, $alt);
 
-      push @filtered_vars, [$sample, $chr, $pos, $ref, $alt, $n_freq, $t_freq, $trinuc, $trans_trinuc, $grouped_ref, $grouped_alt];
+      push @filtered_vars, [$sample, $chr, $pos, $ref, $alt, $n_freq, $t_freq, $trinuc, $trans_trinuc, $grouped_ref, $grouped_alt, $type];
     }
   }
   return(\@filtered_vars);
 }
+
 
 sub group_muts {
   my ($trinuc, $ref, $alt) = @_;
@@ -190,7 +199,7 @@ sub count {
   my $sample;
 
   foreach my $var ( @$var_ref ) {
-    my ($samp, $chr, $pos, $ref, $alt, $n_freq, $t_freq, $trinuc, $trans_trinuc, $grouped_ref, $grouped_alt) = @$var;
+    my ($samp, $chr, $pos, $ref, $alt, $n_freq, $t_freq, $trinuc, $trans_trinuc, $grouped_ref, $grouped_alt, $type) = @$var;
     $sample = $samp;
 
     $genome_wide_snvs{$trinuc}{"$ref>$alt"}++;		# count genome-wide trinuc transformations: "A>C"
@@ -203,7 +212,7 @@ sub count {
     $tri_count{$chr}++;								            # count total trinucs per chromosome
 
     # Record location of each snv per sample
-    push @snv_dist, [ $sample, $chr, $pos, $ref, $alt, $trinuc, "$ref>$alt", $trans_trinuc, "$grouped_ref>$grouped_alt" ];
+    push @snv_dist, [ $sample, $chr, $pos, $ref, $alt, $trinuc, "$ref>$alt", $trans_trinuc, "$grouped_ref>$grouped_alt", $type ];
 
     my $snp_count = $snp_freq{$chr}{$ref}{$alt};
     my ($mut_cont) = eval sprintf('%.1f', $snp_count/$snp_count{$chr} * 100);
@@ -213,6 +222,7 @@ sub count {
   }
   return($sample, $all_snvs_count, \%genome_wide_snvs, \%snvs_by_chrom, \%snp_count, \%snp_freq, \%tri_count, \@snv_dist);
 }
+
 
 sub write_snvs_per_chrom {
   my ($chrom_out_file, $sample, $snvs_by_chrom_ref, $snp_count_ref) = @_;
@@ -236,6 +246,7 @@ sub write_snvs_per_chrom {
   say "...done";
 }
 
+
 sub write_snvs_genome_wide {
   my ($all_snvs_count, $sample, $genome_wide_snvs_ref) = @_;
   my %genome_wide_snvs = %{ $genome_wide_snvs_ref };
@@ -255,16 +266,16 @@ sub write_snvs_genome_wide {
   say "...done";
 }
 
-sub write_snv_distribution {
+sub write_dataframe {
   my ($all_snvs_count, $sample, $snv_dist_ref) = @_;
   open my $snv_dist, '>>',  $snv_dist_file or die $!;
 
   say "Printing out genome-wide snv distribution '$snv_dist_file' for $sample...";
 
   foreach my $var ( @$snv_dist_ref ) {
-    my ($samp, $chr, $pos, $ref, $alt, $trinuc, $trans, $decomp_trinuc, $grouped_trans) = @$var;
+    my ($samp, $chr, $pos, $ref, $alt, $trinuc, $trans, $decomp_trinuc, $grouped_trans, $type) = @$var;
     $sample = $samp;
-    print $snv_dist join("\t", $sample, $chr, $pos, $ref, $alt, $trinuc, $trans, $decomp_trinuc, $grouped_trans) . "\n";
+    print $snv_dist join("\t", $sample, $chr, $pos, $ref, $alt, $trinuc, $trans, $decomp_trinuc, $grouped_trans, $type) . "\n";
   }
 }
 

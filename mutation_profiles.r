@@ -1,5 +1,5 @@
 library(ggplot2)
-library(dplyr)
+suppressMessages(library(dplyr))
 
 
 clean_theme <- function(base_size = 12){
@@ -17,15 +17,23 @@ clean_theme <- function(base_size = 12){
 }
 
 
-get_data <- function(infile = "GW.snv.dist.txt"){
-  data<-read.delim(infile, header = F)
+get_data <- function(infile = "GW.snv.dist.txt",force=NA){
+  if(!is.na(force)){
+    data<-read.delim(infile, header = F)
+  }
+  else if(!exists("data", mode = "list")){
+    data<-read.delim(infile, header = F)
+  }
+  
   colnames(data)=c("sample", "chrom", "pos", "ref", "alt", "tri", "trans", "decomposed_tri", "grouped_trans", "type")
+  levels(data$type) <- tolower(levels(data$type))
+  #data <- filter(data, type == 'germline')
   
   #filter on chroms
   # data<-filter(data, chrom != "Y" & chrom != "4")
   #filter out samples
   # data<-filter(data, sample != "A373R1" & sample != "A373R7" & sample != "A512R17" )
-  # data<-droplevels(data)
+  data<-droplevels(data)
   dir.create(file.path("plots"), showWarnings = FALSE)
   return(data)
 }
@@ -101,23 +109,21 @@ mutational_signatures <- function(samples=NA, pie=NA){
   suppressMessages(require(BSgenome.Dmelanogaster.UCSC.dm6))
   suppressMessages(require(deconstructSigs))
   
-  if(!exists('dmel6_counts')){
+  if(!exists('scaling_factor')){
     source('R/dmel6.trinucs.R')
     cat("calculationg trinucleotide frequencies in genome\n")
-    dmel6_counts <-trinuc.freqs()
+    scaling_factor <-trinuc.freqs()
   }
-  
   
   data<-get_data()
   genome <- BSgenome.Dmelanogaster.UCSC.dm6
-  somatic_snvs <- filter(data, type == 'somatic')
   
   if(is.na(samples)){
-    somatic_snvs$tissue = 'All'
-    sigs.input <- mut.to.sigs.input(mut.ref = somatic_snvs, sample.id = "tissue", chr = "chrom", pos = "pos", alt = "alt", ref = "ref", bsg = genome)
+    data$tissue = 'All'
+    sigs.input <- mut.to.sigs.input(mut.ref = data, sample.id = "tissue", chr = "chrom", pos = "pos", alt = "alt", ref = "ref", bsg = genome)
     sig_plot<-whichSignatures(tumor.ref = sigs.input, signatures.ref = signatures.cosmic, sample.id = 'All',
                               contexts.needed = TRUE,
-                              tri.counts.method = dmel6_counts
+                              tri.counts.method = scaling_factor
                               )
 
     cat("Writing to file 'plots/all_signatures.pdf'\n")
@@ -133,17 +139,17 @@ mutational_signatures <- function(samples=NA, pie=NA){
   }
   
   else{
-  	sigs.input <- mut.to.sigs.input(mut.ref = somatic_snvs, sample.id = "sample", chr = "chrom", pos = "pos", alt = "alt", ref = "ref", bsg = genome)
+  	sigs.input <- mut.to.sigs.input(mut.ref = data, sample.id = "sample", chr = "chrom", pos = "pos", alt = "alt", ref = "ref", bsg = genome)
   	cat("sample", "snv_count", sep="\t", "\n")
-      for(s in levels(somatic_snvs$sample)) {
-        snv_count<-nrow(filter(somatic_snvs, sample == s))
+      for(s in levels(data$sample)) {
+        snv_count<-nrow(filter(data, sample == s))
         
         if(snv_count > 50){
           cat(s, snv_count, sep="\t", "\n")
         
           sig_plot<-whichSignatures(tumor.ref = sigs.input, signatures.ref = signatures.nature2013, sample.id = s,
                         contexts.needed = TRUE,
-                        tri.counts.method = 'genome')
+                        tri.counts.method = scaling_factor)
           
           outfile<-(paste('plots/', s, '_signatures.pdf', sep = ''))
           cat("Writing to file", outfile, "\n")
