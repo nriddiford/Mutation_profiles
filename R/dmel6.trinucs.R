@@ -1,7 +1,7 @@
 require(dplyr)
 
 
-trinuc.freqs <- function(genome=NA, write=NA){
+trinuc.freqs <- function(genome=NA, count=NA){
   if(is.na(genome)){
     cat("No genome specfied, defaulting to 'BSgenome.Dmelanogaster.UCSC.dm6'\n")
     library(BSgenome.Dmelanogaster.UCSC.dm6, quietly = TRUE)
@@ -11,23 +11,21 @@ trinuc.freqs <- function(genome=NA, write=NA){
   params <- new("BSParams", X = Dmelanogaster, FUN = trinucleotideFrequency, exclude = c("M", "_"), simplify = TRUE)
   data<-as.data.frame(bsapply(params))
   data$genome<-as.integer(rowSums(data))
-  data$gen2<-(data$genome*2)
-  data$x <- (1/data$genome)
+  data$genome_adj<-(data$genome*2)
   
-  scaling_factor<-data['x']
-  
-  #gen_wide<-cbind(tri = rownames(gen_wide), gen_wide)
-  #colnames(gen_wide) <- c("tri", "x")
-  #rownames(gen_wide) <- NULL
-  
-  if(is.na(write)){
-    return(scaling_factor)
+  if(!is.na(count)){
+    tri_count<-data['genome_adj']
+    tri_count<-cbind(tri = rownames(tri_count), tri_count)
+    colnames(tri_count) <- c("tri", "count")
+    rownames(tri_count) <- NULL
+    return(tri_count)
   }
   else{
-    cat("Writing genome-wide trinucleotide frequencies to 'data/tri.counts.dmel6.rda'\n")
-    write.table(scaling_factor, "data/tri.counts.dmel6.txt", sep="\t", quote=FALSE)
-    save(scaling_factor, file="data/tri.counts.dmel6.rda")
+    data$x <- (1/data$genome)
+    scaling_factor<-data['x']
+    return(scaling_factor)
   }
+  
 }
 
 
