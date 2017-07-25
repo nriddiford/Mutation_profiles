@@ -17,13 +17,8 @@ clean_theme <- function(base_size = 12){
 }
 
 
-get_data <- function(infile = "GW.snv.dist.txt",force=NA){
-  if(!is.na(force)){
-    data<-read.delim(infile, header = F)
-  }
-  else if(!exists("data", mode = "list")){
-    data<-read.delim(infile, header = F)
-  }
+get_data <- function(infile = "GW.snv.dist.txt"){
+  data<-read.delim(infile, header = F)
   
   colnames(data)=c("sample", "chrom", "pos", "ref", "alt", "tri", "trans", "decomposed_tri", "grouped_trans", "type")
   levels(data$type) <- tolower(levels(data$type))
@@ -41,9 +36,13 @@ get_data <- function(infile = "GW.snv.dist.txt",force=NA){
 
 stats <- function(){
   data<-get_data()
-  cat("Number of somatic mutations per sample:")
+  cat("sample", "snvs", sep='\t', "\n")
   rank<-sort(table(data$sample), decreasing = TRUE)
-  print(rank)
+  rank<-as.array(rank)
+  
+  for (i in 1:nrow(rank)){
+    cat(names(rank[i]), rank[i], sep='\t', "\n")
+  }
   
   all_ts<-nrow(filter(data, trans == "A>G" | trans == "C>T" | trans == "G>A" | trans == "T>C"))
   all_tv<-nrow(filter(data, trans != "A>G" & trans != "C>T" & trans != "G>A" & trans != "T>C"))
@@ -170,6 +169,10 @@ mutational_signatures <- function(samples=NA, pie=NA){
 notch_hits <- function(){
   data<-get_data()
   data<-filter(data, chrom == "X", pos >= 3000000, pos <= 3300000)
+  
+  if(nrow(data) == 0){
+    stop("There are no snvs in Notch. Exiting\n")
+  }
   
   p<-ggplot(data)
   p<-p + geom_point(aes(pos/1000000, sample, colour = trans, size = 2))

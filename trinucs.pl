@@ -122,9 +122,10 @@ sub parse_vcf {
     my ($chr, $pos, $ref, $alt) = (split)[0,1,3,4];
     my ($n_freq, $t_freq) = ('-', '-');
     next if $ref eq 'N';
-    my $type = '-';
-    ($type) = $_ =~ /VT=(.*?);/;
-    # my $depth = $_ =~ /
+    my $type = 'somatic';
+    if ($_ =~ /VT=(.*?);/){
+      $type = $1;
+    }
     push @vars, [$sample, $chr, $pos, $ref, $alt, $n_freq, $t_freq, $type];
   }
   return(\@vars);
